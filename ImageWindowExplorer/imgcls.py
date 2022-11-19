@@ -1,5 +1,8 @@
 import tkinter as tk
 from PIL import Image, ImageTk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
 
 
 class MainImage:
@@ -24,6 +27,21 @@ class MainImage:
         """Crops raw image and returns """
         return ImageTk.PhotoImage(self._raw_image.crop((left, upper, right, bottom)))
 
+    def get_rgb_values(self):
+        """Returns pixel values by channels"""
+        pixels_count = self.size[0] * self.size[1]
+
+        pixels_values = np.ndarray(shape=(pixels_count, 3))
+        pixel_ind = 0
+
+        for x in range(self.size[0]):
+            for y in range(self.size[1]):
+                # Get RGB values for current pixel
+                pixels_values[pixel_ind] = self._raw_image.getpixel((x, y))
+                pixel_ind += 1
+
+        return pixels_values
+
 
 class ImageViewer:
     def __init__(self, root: tk.Tk):
@@ -36,6 +54,9 @@ class ImageViewer:
         self.small_image = None
         self.small_image_id = None
         self.border_id = None
+
+        self.graphics_window = None
+        self.show_plot_window_btn = None
 
     def open_image(self, image_path: str):
         """Opens image from the filesystem and updates main_image field"""
@@ -82,8 +103,8 @@ class ImageViewer:
     def initialize_interface(self):
         """Initialises interface elements"""
         self.main_image_canvas = tk.Canvas(self.root)
-
-        self.small_image_canvas = tk.Canvas(self.root, width=50, height=50)
+        self.small_image_canvas = tk.Canvas(self.root)
+        self.show_plot_window_btn = tk.Button(self.root)
 
     def configure_layout(self):
         # Main canvas
@@ -93,7 +114,71 @@ class ImageViewer:
         self.main_image_canvas.config(width=self.main_image.size[0], height=self.main_image.size[1])
         # Small canvas
         img_pos_X, img_pos_Y = self.main_image.size[0] + 20, 20
+        self.small_image_canvas.config(width=50, height=50)
         self.small_image_canvas.place(x=img_pos_X, y=img_pos_Y)
+        # Show graphics button
+        self.show_plot_window_btn.config(width=15, height=2, command=self.show_image_histogram_window,
+                                         text='Show graphics')
+        self.show_plot_window_btn.place(x=img_pos_X, y=img_pos_Y + 60)
         # Root
-        self.root.geometry(f'{self.main_image.size[0] + 100}x{self.main_image.size[1]}')
+        self.root.geometry(f'{self.main_image.size[0] + 120}x{self.main_image.size[1]}')
         self.root.resizable(False, False)
+
+    def show_image_histogram_window(self):
+        self.graphics_window = GraphicsWindow(self.root, (6, 4))
+
+        self.graphics_window.initialize_components()
+
+        x_label = 'Channel value'
+        y_label = 'Frequency'
+        plot_titles = ['Red', 'Green', 'Blue']
+        # Transpose pixel values for plotting histogram
+        pixel_values = self.main_image.get_rgb_values().T
+
+        self.graphics_window.plot_histogram(pixel_values, x_label, y_label, plot_titles)
+
+
+class GraphicsWindow:
+    """Represents window with region for plotting graphics"""
+    def __init__(self, parent_widget, size: tuple[int, int]):
+        self.parent_widget = parent_widget
+        self.width = size[0]
+        self.height = size[1]
+        self.window_widget = tk.Toplevel(self.parent_widget)
+
+        self.chart_type = None
+        self.figure = None
+
+    def initialize_components(self):
+        """Initialises plot region"""
+        self.figure = plt.Figure(figsize=(self.width, self.height), dpi=100)
+        # Represent Figure as Widget
+        self.chart_type = FigureCanvasTkAgg(self.figure, self.window_widget)
+        self.chart_type.get_tk_widget().place(x=0, y=0)
+
+    def plot_histogram(self,
+                       values: np.ndarray,
+                       x_label: str,
+                       y_label: str,
+                       plot_labels: list[str]):
+        """Plot values histograms with specified titles and x, y labels"""
+
+        plots_number = values.shape[0]
+        # Clear plot region
+        self.figure.clear()
+        cur_ax = self.figure.add_subplot(111)
+
+        for plot_ind in range(plots_number):
+            # PLot histogram
+            cur_ax.hist(values[plot_ind, :], rwidth=0.8, bins=255, density=True, label=plot_labels[plot_ind])
+
+        # Configure plot parameters
+        cur_ax.set_xlim(0, 255)
+        cur_ax.set_xlabel(x_label)
+        cur_ax.set_ylabel(y_label)
+        cur_ax.legend()
+        # Update plot region
+        self.chart_type.draw()
+        # Update window size parameters
+        self.window_widget.geometry(f'{96 * self.width}x{96 * self.height}')
+        self.window_widget.resizable(False, False)
