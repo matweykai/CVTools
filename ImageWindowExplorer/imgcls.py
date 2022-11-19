@@ -42,6 +42,32 @@ class MainImage:
 
         return pixels_values
 
+    def get_window_stats(self, left, upper, right, bottom):
+        """Counts mean and variance in the defined window"""
+        mean_vec = np.zeros(shape=3)
+
+        # Mean of (pixel value)^2 for variance calculation improvement
+        pixel_2_mean_vec = np.zeros(shape=3)
+        pixel_count = (bottom - upper) * (right - left)
+
+        for x in range(left, right):
+            for y in range(upper, bottom):
+                pixel_rgb_value = np.array(self._raw_image.getpixel((x, y)))
+
+                mean_vec += pixel_rgb_value
+                pixel_2_mean_vec += pixel_rgb_value * pixel_rgb_value.T
+
+        mean_vec /= pixel_count
+        pixel_2_mean_vec /= pixel_count
+
+        var_vec = pixel_2_mean_vec - np.power(mean_vec, 2)
+
+        return mean_vec, var_vec
+
+    def get_pixel_rgb(self, x, y):
+        """Returns pixel RGB value"""
+        return self._raw_image.getpixel((x, y))
+
 
 class ImageViewer:
     def __init__(self, root: tk.Tk):
@@ -57,11 +83,13 @@ class ImageViewer:
 
         self.graphics_window = None
         self.show_plot_window_btn = None
+        self.information_panel_frame = None
+        self.information_window = None
 
     def open_image(self, image_path: str):
         """Opens image from the filesystem and updates main_image field"""
         image_obj = Image.open(image_path)
-        self.main_image = MainImage(image_obj, [self._draw_small_image, self._draw_border])
+        self.main_image = MainImage(image_obj, [self._draw_small_image, self._draw_border, self._update_statistics])
 
     def _calculate_border_coordinates(self, cursor_X, cursor_Y):
         """Calculates small image coordinates with x and y mouse coordinates"""
@@ -100,11 +128,28 @@ class ImageViewer:
                                                                  width=1,
                                                                  outline='black')
 
+    def _update_statistics(self, cursor_X, cursor_Y):
+        """Shows pixel x,y, mean, variance, intensity and RGB params in the right panel"""
+        x, y = cursor_X, cursor_Y
+        # Collect information
+        R_channel, G_channel, B_channel = self.main_image.get_pixel_rgb(cursor_X, cursor_Y)
+        wind_mean, wind_var = self.main_image.get_window_stats(*self._calculate_border_coordinates(cursor_X, cursor_Y))
+        intensity = (R_channel + G_channel + B_channel) / 3
+        # Round decimals
+        wind_mean = np.around(wind_mean, decimals=2)
+        wind_var = np.around(wind_var, decimals=2)
+        intensity = np.around(intensity, decimals=2)
+
+        # Update information window content
+        self.information_window.update_view(x, y, (R_channel, G_channel, B_channel), intensity, wind_mean, wind_var)
+
     def initialize_interface(self):
         """Initialises interface elements"""
         self.main_image_canvas = tk.Canvas(self.root)
         self.small_image_canvas = tk.Canvas(self.root)
         self.show_plot_window_btn = tk.Button(self.root)
+        self.information_panel_frame = tk.Frame(self.root)
+        self.information_window = InformationPanel(self.information_panel_frame)
 
     def configure_layout(self):
         # Main canvas
@@ -119,9 +164,13 @@ class ImageViewer:
         # Show graphics button
         self.show_plot_window_btn.config(width=15, height=2, command=self.show_image_histogram_window,
                                          text='Show graphics')
-        self.show_plot_window_btn.place(x=img_pos_X, y=img_pos_Y + 60)
+        self.show_plot_window_btn.place(x=img_pos_X, y=self.main_image.size[1] - 35)
+        # Information panel
+        self.information_panel_frame.config(width=250, height=self.main_image.size[1] - 40, relief=tk.GROOVE)
+        self.information_panel_frame.place(x=img_pos_X + 25, y=10)
+        self.information_window.configure_layout()
         # Root
-        self.root.geometry(f'{self.main_image.size[0] + 120}x{self.main_image.size[1]}')
+        self.root.geometry(f'{self.main_image.size[0] + 300}x{self.main_image.size[1]}')
         self.root.resizable(False, False)
 
     def show_image_histogram_window(self):
@@ -136,6 +185,39 @@ class ImageViewer:
         pixel_values = self.main_image.get_rgb_values().T
 
         self.graphics_window.plot_histogram(pixel_values, x_label, y_label, plot_titles)
+
+
+class InformationPanel:
+    """Represents information panel from the right side of the app"""
+    def __init__(self, root):
+        # String variables for dynamical text update
+        self.x_y_str_var = tk.StringVar()
+        self.rgb_str_var = tk.StringVar()
+        self.intensity_str_var = tk.StringVar()
+        self.mean_str_var = tk.StringVar()
+        self.var_str_var = tk.StringVar()
+        # Labels widgets
+        self.x_y_label = tk.Label(root, textvariable=self.x_y_str_var)
+        self.rgb_label = tk.Label(root, textvariable=self.rgb_str_var)
+        self.intensity_label = tk.Label(root, textvariable=self.intensity_str_var)
+        self.mean_label = tk.Label(root, textvariable=self.mean_str_var)
+        self.var_label = tk.Label(root, textvariable=self.var_str_var)
+
+    def update_view(self, x_val, y_val, RGB: tuple[int, int, int], intensity, mean, variance):
+        """Updates values in labels"""
+        self.x_y_str_var.set(f'x = {x_val:4d}; y = {y_val:4d}')
+        self.rgb_str_var.set(f'R: {RGB[0]:4d} G: {RGB[1]:4d} B: {RGB[2]:4d}')
+        self.intensity_str_var.set(f'Intensity = {intensity:6.2f}')
+        self.mean_str_var.set(f'𝝻_R = {mean[0]:6.2f} 𝝻_G = {mean[1]:6.2f} 𝝻_B = {mean[2]:6.2f}')
+        self.var_str_var.set(f'𝗗_R = {variance[0]:7.2f} 𝗗_G = {variance[1]:7.2f} 𝗗_B = {variance[2]:7.2f}')
+
+    def configure_layout(self):
+        """Configures layout and places labels"""
+        self.x_y_label.grid(row=0, sticky=tk.W)
+        self.rgb_label.grid(row=1, sticky=tk.W)
+        self.intensity_label.grid(row=2, sticky=tk.W)
+        self.mean_label.grid(row=3, sticky=tk.W)
+        self.var_label.grid(row=4, sticky=tk.W)
 
 
 class GraphicsWindow:
