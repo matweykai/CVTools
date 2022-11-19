@@ -86,6 +86,8 @@ class ImageViewer:
         self.information_panel_frame = None
         self.information_window = None
 
+        self.tool_bar = None
+
     def open_image(self, image_path: str):
         """Opens image from the filesystem and updates main_image field"""
         image_obj = Image.open(image_path)
@@ -150,6 +152,7 @@ class ImageViewer:
         self.show_plot_window_btn = tk.Button(self.root)
         self.information_panel_frame = tk.Frame(self.root)
         self.information_window = InformationPanel(self.information_panel_frame)
+        self.tool_bar = tk.Menu(self.root)
 
     def configure_layout(self):
         # Main canvas
@@ -161,14 +164,14 @@ class ImageViewer:
         img_pos_X, img_pos_Y = self.main_image.size[0] + 20, 20
         self.small_image_canvas.config(width=50, height=50)
         self.small_image_canvas.place(x=img_pos_X, y=img_pos_Y)
-        # Show graphics button
-        self.show_plot_window_btn.config(width=15, height=2, command=self.show_image_histogram_window,
-                                         text='Show graphics')
-        self.show_plot_window_btn.place(x=img_pos_X, y=self.main_image.size[1] - 35)
         # Information panel
-        self.information_panel_frame.config(width=250, height=self.main_image.size[1] - 40, relief=tk.GROOVE)
-        self.information_panel_frame.place(x=img_pos_X + 25, y=10)
+        self.information_panel_frame.config(width=250, height=110, relief=tk.RAISED, borderwidth=2)
+        self.information_panel_frame.grid_propagate(False)
+        self.information_panel_frame.place(x=img_pos_X, y=10)
         self.information_window.configure_layout()
+        # Toolbar
+        self.tool_bar.add_command(label='Show graphics', command=self.show_image_histogram_window)
+        self.root.config(menu=self.tool_bar)
         # Root
         self.root.geometry(f'{self.main_image.size[0] + 300}x{self.main_image.size[1]}')
         self.root.resizable(False, False)
