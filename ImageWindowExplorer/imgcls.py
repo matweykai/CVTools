@@ -81,10 +81,7 @@ class ImageViewer:
 
         self.main_image_canvas = None
         self.main_image_id = None
-        self.small_image_canvas = None
 
-        self.small_image = None
-        self.small_image_id = None
         self.border_id = None
 
         self.graphics_window = None
@@ -97,7 +94,7 @@ class ImageViewer:
     def open_image(self, image_path: str):
         """Opens image from the filesystem and updates main_image field"""
         image_obj = Image.open(image_path)
-        return MainImage(image_obj, [self._draw_small_image, self._draw_border, self._update_statistics])
+        return MainImage(image_obj, [self._draw_border, self._update_statistics])
 
     def _calculate_border_coordinates(self, cursor_X, cursor_Y):
         """Calculates small image coordinates with x and y mouse coordinates"""
@@ -107,17 +104,6 @@ class ImageViewer:
         bottom = min([cursor_Y + 12, self.main_image.size[1]])
 
         return left, upper, right, bottom
-
-    def _draw_small_image(self, cursor_X, cursor_Y):
-        """Draws small image. Source is under the latest mouse position"""
-        left, upper, right, bottom = self._calculate_border_coordinates(cursor_X, cursor_Y)
-
-        self.small_image = self.main_image.crop(left, upper, right, bottom)
-        # Delete previous small image
-        if self.small_image_id is not None:
-            self.small_image_canvas.delete(self.small_image_id)
-        # Draw new small image
-        self.small_image_id = self.small_image_canvas.create_image((0, 0), anchor='nw', image=self.small_image)
 
     def _draw_border(self, cursor_X, cursor_Y):
         """Draws rectangle over the main image. Source is under the latest mouse position"""
@@ -171,7 +157,6 @@ class ImageViewer:
     def initialize_interface(self):
         """Initialises interface elements"""
         self.main_image_canvas = tk.Canvas(self.root)
-        self.small_image_canvas = tk.Canvas(self.root)
         self.show_plot_window_btn = tk.Button(self.root)
         self.information_panel_frame = tk.Frame(self.root)
         self.information_window = InformationPanel(self.information_panel_frame)
@@ -185,14 +170,10 @@ class ImageViewer:
         self.main_image_canvas.place(x=0, y=0)
         self.main_image_id = self.main_image_canvas.create_image((0, 0), image=self.main_image.photo_image, anchor='nw')
         self.main_image_canvas.config(width=self.main_image.size[0], height=self.main_image.size[1])
-        # Small canvas
-        img_pos_X, img_pos_Y = self.main_image.size[0] + 20, 20
-        self.small_image_canvas.config(width=50, height=50)
-        self.small_image_canvas.place(x=img_pos_X, y=img_pos_Y)
         # Information panel
         self.information_panel_frame.config(width=250, height=110, relief=tk.RAISED, borderwidth=2)
         self.information_panel_frame.grid_propagate(False)
-        self.information_panel_frame.place(x=img_pos_X, y=10)
+        self.information_panel_frame.place(x=self.main_image.size[0] + 20, y=10)
         self.information_window.configure_layout()
         # Toolbar
         # Add elements to the menu if it is empty
