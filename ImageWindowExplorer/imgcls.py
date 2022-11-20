@@ -184,6 +184,7 @@ class ImageViewer:
         # Root
         self.root.geometry(f'{self.main_image.size[0] + 300}x{self.main_image.size[1]}')
         self.root.resizable(False, False)
+        self.root.title('Image Statistics Viewer')
 
     def show_image_histogram_window(self):
         self.graphics_window = GraphicsWindow(self.root, (6, 4))
@@ -249,6 +250,8 @@ class GraphicsWindow:
         # Represent Figure as Widget
         self.chart_type = FigureCanvasTkAgg(self.figure, self.window_widget)
         self.chart_type.get_tk_widget().place(x=0, y=0)
+        # Set window params
+        self.window_widget.title('Image histogram')
 
     def plot_histogram(self,
                        values: np.ndarray,
