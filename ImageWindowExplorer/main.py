@@ -7,7 +7,6 @@ if __name__ == '__main__':
 
     viewer = ImageViewer(root)
 
-    viewer.open_image('abc.jpg')
     viewer.initialize_interface()
     viewer.configure_layout()
 

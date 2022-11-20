@@ -1,8 +1,13 @@
 import tkinter as tk
+from tkinter import filedialog as fd
+
 from PIL import Image, ImageTk
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 import numpy as np
+from os import getcwd
 
 
 class MainImage:
@@ -10,7 +15,7 @@ class MainImage:
     def __init__(self, image_obj: Image.Image, position_callback_lst: list[callable]):
         self.cursor_X = None
         self.cursor_Y = None
-        self._raw_image = image_obj
+        self._raw_image = image_obj.convert('RGB')
         self.photo_image = ImageTk.PhotoImage(image_obj)
         self.position_callback_lst = position_callback_lst
         self.size = (self.photo_image.width(), self.photo_image.height())
@@ -75,6 +80,7 @@ class ImageViewer:
         self.main_image = None
 
         self.main_image_canvas = None
+        self.main_image_id = None
         self.small_image_canvas = None
 
         self.small_image = None
@@ -91,7 +97,7 @@ class ImageViewer:
     def open_image(self, image_path: str):
         """Opens image from the filesystem and updates main_image field"""
         image_obj = Image.open(image_path)
-        self.main_image = MainImage(image_obj, [self._draw_small_image, self._draw_border, self._update_statistics])
+        return MainImage(image_obj, [self._draw_small_image, self._draw_border, self._update_statistics])
 
     def _calculate_border_coordinates(self, cursor_X, cursor_Y):
         """Calculates small image coordinates with x and y mouse coordinates"""
@@ -145,6 +151,23 @@ class ImageViewer:
         # Update information window content
         self.information_window.update_view(x, y, (R_channel, G_channel, B_channel), intensity, wind_mean, wind_var)
 
+    def _on_open_command(self):
+        """Open command callback handler"""
+        # Get filename from user
+        filename = fd.askopenfilename(title='Open image', initialdir=getcwd(),
+                                      filetypes=((('Any', '*.*'), ('PNG', '*.png'),
+                                                  ('JPG', '*.jpg'), ('JPEG', '*.jpeg'))))
+        new_image = self.open_image(filename)
+        self._update_main_image(new_image)
+
+    def _update_main_image(self, new_image_obj: MainImage):
+        """Updates main image with new one"""
+        if self.main_image_id is not None:
+            self.main_image_canvas.delete(self.main_image_id)
+        # Add new image to the canvas
+        self.main_image = new_image_obj
+        self.configure_layout()
+
     def initialize_interface(self):
         """Initialises interface elements"""
         self.main_image_canvas = tk.Canvas(self.root)
@@ -154,11 +177,13 @@ class ImageViewer:
         self.information_window = InformationPanel(self.information_panel_frame)
         self.tool_bar = tk.Menu(self.root)
 
+        self._update_main_image(self.open_image('abc.jpg'))
+
     def configure_layout(self):
         # Main canvas
         self.main_image_canvas.bind('<Motion>', self.main_image.mouse_move_handler)
         self.main_image_canvas.place(x=0, y=0)
-        self.main_image_canvas.create_image((0, 0), image=self.main_image.photo_image, anchor='nw')
+        self.main_image_id = self.main_image_canvas.create_image((0, 0), image=self.main_image.photo_image, anchor='nw')
         self.main_image_canvas.config(width=self.main_image.size[0], height=self.main_image.size[1])
         # Small canvas
         img_pos_X, img_pos_Y = self.main_image.size[0] + 20, 20
@@ -170,7 +195,10 @@ class ImageViewer:
         self.information_panel_frame.place(x=img_pos_X, y=10)
         self.information_window.configure_layout()
         # Toolbar
-        self.tool_bar.add_command(label='Show graphics', command=self.show_image_histogram_window)
+        # Add elements to the menu if it is empty
+        if self.tool_bar.index("end") < 2:
+            self.tool_bar.add_command(label='Open', command=self._on_open_command)
+            self.tool_bar.add_command(label='Show graphics', command=self.show_image_histogram_window)
         self.root.config(menu=self.tool_bar)
         # Root
         self.root.geometry(f'{self.main_image.size[0] + 300}x{self.main_image.size[1]}')
