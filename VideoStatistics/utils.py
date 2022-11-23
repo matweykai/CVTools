@@ -13,3 +13,9 @@ def normalize_g(f_data: np.array,  g_data: np.array):
     result = (g_data + alpha) / g_std * f_std
 
     return result
+
+
+def calculate_l1(left_seq: np.array, right_seq: np.array):
+    """ Calculates L1 distance between left and right sequences """
+    elements_dist = np.abs(right_seq - left_seq)
+    return np.sum(elements_dist) / elements_dist.shape[0]
